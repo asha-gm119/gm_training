@@ -1,0 +1,12 @@
+ol{
+    margin:0px;
+    padding:0px;
+    list-style-type: none;
+}
+li{
+    border:1px solid blue;
+    width:fit-content;
+    font-weight: 700;
+    text-align: center;
+    margin: 5px;
+}

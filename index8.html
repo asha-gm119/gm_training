@@ -1,0 +1,43 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <script>
+        const p={
+            name:"jhbd",
+            age:200,
+            city:"NY"
+        }
+        document.write("Name:"+p.city+"<br>");
+        p.city="LA";
+        document.write("Name:"+p.city+"<br>");
+
+        const name1=["Chaitanya","Liki","Cherry"];
+        document.write(name1[1]+"<br>");
+        setTimeout(function(){
+            console.log("delayed");
+        },4000);
+        function read(callback)
+        {
+         setTimeout(()=>{
+            console.log("Read complete");
+            callback();
+         },2000);  
+    }
+    read(()=>{
+        console.log("Procesing");
+    });
+    async function fetchdata(){
+        console.log("Start");
+        await new Promise(resolve=>setTimeout(console.log("inside"),10000));
+        console.log("after 1 ");
+    }
+    fetchdata();
+        
+    </script>
+</body>
+</html>
