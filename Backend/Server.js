@@ -12,7 +12,7 @@ app.use('/api/employees', employeeRoutes);
 
 const mongoose = require('mongoose');
 
-mongoose.connect('mongodb://localhost:27017/employeeDB', {
+mongoose.connect('mongodb+srv://ashalatha:Gray%40123%24@training.fdumrla.mongodb.net/?retryWrites=true&w=majority&appName=training', {
   useNewUrlParser: true,
   useUnifiedTopology: true,
 })
