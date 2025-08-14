@@ -18,7 +18,7 @@ export default function Alerts({ user, alerts, setAlerts }) {
     const apiBase =
       process.env.REACT_APP_API_BASE || "http://localhost:5000";
 
-    const eventSource = new EventSource(`${apiBase}/api/alerts/stream`, {
+    const eventSource = new EventSource(`${apiBase}/alerts/stream`, {
       withCredentials: true,
     });
     eventSourceRef.current = eventSource;
