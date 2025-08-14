@@ -72,6 +72,25 @@ app.use(
     cookie: { secure: false, httpOnly: true, maxAge: 1000 * 60 * 10 }
   })
 );
+// Allow your Netlify frontend + localhost for dev
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://hilarious-sorbet-eb5396.netlify.app"
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // allow requests with no origin (like curl, Postman)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      return callback(new Error("CORS policy does not allow this origin: " + origin), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true, // if you use cookies/auth headers
+}));
+
+// also handle preflight requests explicitly
 app.options("*", cors());
 // Routes (all under /api)
 app.use("/api/auth", authRoutes);
