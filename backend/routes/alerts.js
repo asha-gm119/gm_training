@@ -1,58 +1,47 @@
 import express from "express";
-import { subscriber } from "../utils/redisClient.js";
-
 const router = express.Router();
 
-// Keep track of active SSE clients
-const clients = [];
+let clients = [];
 
-/**
- * SSE stream endpoint
- */
 router.get("/stream", (req, res) => {
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.setHeader("Access-Control-Allow-Origin", process.env.CLIENT_URL );
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-    res.setHeader("Vary", "Origin");
-  res.flushHeaders();
+  try {
+    const allowedOrigin =
+      process.env.CLIENT_URL || "https://radiant-otter-7af0be.netlify.app";
 
-  // Register this client
-  clients.push(res);
+    // CORS headers
+    res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
 
-  // Send initial "connected" event
-  res.write(`data: ${JSON.stringify({ type: "connected" })}\n\n`);
+    // SSE headers
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
 
-  // Keep-alive heartbeat
-  const keepAlive = setInterval(() => {
-    res.write(`data: ${JSON.stringify({ type: "ping" })}\n\n`);
-  }, 20000);
+    // Send headers immediately
+    if (res.flushHeaders) {
+      res.flushHeaders();
+    }
 
-  // Cleanup when client disconnects
-  req.on("close", () => {
-    clearInterval(keepAlive);
-    const idx = clients.indexOf(res);
-    if (idx !== -1) clients.splice(idx, 1);
-  });
-});
+    // Store client
+    clients.push(res);
 
-/**
- * Redis pub/sub: forward alerts to all SSE clients
- */
-subscriber.subscribe("alerts", (err) => {
-  if (err) console.error("❌ Redis subscribe failed:", err);
-  else console.log("✅ Subscribed to Redis channel: alerts");
-});
+    // Initial comment (does not break JSON parsing)
+    res.write(": connected\n\n");
 
-subscriber.on("message", (channel, message) => {
-  if (channel !== "alerts") return;
-  console.log("📢 Alert received from Redis:", message);
+    // Heartbeat every 20s
+    const keepAlive = setInterval(() => {
+      res.write(`: heartbeat\n\n`);
+    }, 20000);
 
-  // Fan out to all connected SSE clients
-  clients.forEach((client) => {
-    client.write(`data: ${message}\n\n`);
-  });
+    // On disconnect
+    req.on("close", () => {
+      clearInterval(keepAlive);
+      clients = clients.filter((c) => c !== res);
+    });
+  } catch (err) {
+    console.error("🔥 SSE stream error:", err);
+    res.status(500).end();
+  }
 });
 
 export default router;
