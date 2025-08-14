@@ -43,7 +43,7 @@ const allowedOrigins = [
   "http://localhost:3000",
   "https://hilarious-sorbet-eb5396.netlify.app",
   "https://lively-faun-e79255.netlify.app",
-  "https://dulcet-pithivier-6077d4.netlify.app"
+  "https://radiant-otter-7af0be.netlify.app/"
 ];
 
 app.use(cors({
