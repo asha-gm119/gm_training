@@ -3,35 +3,32 @@ import { subscriber } from "../utils/redisClient.js";
 
 const router = express.Router();
 
-// Track connected SSE clients
+// Keep track of active SSE clients
 const clients = [];
 
 /**
- * SSE endpoint
+ * SSE stream endpoint
  */
 router.get("/stream", (req, res) => {
   res.setHeader("Content-Type", "text/event-stream");
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Connection", "keep-alive");
-
-  // 🔥 Must be exact frontend origin (not "*") if using withCredentials:true
-  res.setHeader("Access-Control-Allow-Origin", process.env.CLIENT_URL);
+  res.setHeader("Access-Control-Allow-Origin", process.env.CLIENT_URL || "*");
   res.setHeader("Access-Control-Allow-Credentials", "true");
-
   res.flushHeaders();
 
+  // Register this client
   clients.push(res);
 
-  // Send initial connection event
-  res.write(
-    `data: ${JSON.stringify({ type: "connected", message: "SSE stream established" })}\n\n`
-  );
+  // Send initial "connected" event
+  res.write(`data: ${JSON.stringify({ type: "connected" })}\n\n`);
 
-  // Keep alive with ping
+  // Keep-alive heartbeat
   const keepAlive = setInterval(() => {
     res.write(`data: ${JSON.stringify({ type: "ping" })}\n\n`);
   }, 20000);
 
+  // Cleanup when client disconnects
   req.on("close", () => {
     clearInterval(keepAlive);
     const idx = clients.indexOf(res);
@@ -40,21 +37,21 @@ router.get("/stream", (req, res) => {
 });
 
 /**
- * Redis pub/sub forwarding
+ * Redis pub/sub: forward alerts to all SSE clients
  */
-(async () => {
-  // Ensure Redis subscriber is connected
-  if (!subscriber.isOpen) {
-    await subscriber.connect();
-  }
+subscriber.subscribe("alerts", (err) => {
+  if (err) console.error("❌ Redis subscribe failed:", err);
+  else console.log("✅ Subscribed to Redis channel: alerts");
+});
 
-  await subscriber.subscribe("alerts", (message) => {
-    console.log("📢 Alert received from Redis:", message);
+subscriber.on("message", (channel, message) => {
+  if (channel !== "alerts") return;
+  console.log("📢 Alert received from Redis:", message);
 
-    clients.forEach((client) => {
-      client.write(`data: ${message}\n\n`);
-    });
+  // Fan out to all connected SSE clients
+  clients.forEach((client) => {
+    client.write(`data: ${message}\n\n`);
   });
-})();
+});
 
 export default router;
