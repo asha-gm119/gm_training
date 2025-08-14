@@ -18,10 +18,11 @@ import requestLogger from "./middleware/requestLogger.js";
 import { requestCounter } from "./middleware/requestCounter.js";
 import testRoutes from "./routes/test.js";
 import testRateLimitRoutes from "./routes/testRateLimt.js";
+
 dotenv.config();
 const app = express();
 
-// Connect to MongoDB
+// ----------------- DB -----------------
 mongoose
   .connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
@@ -30,21 +31,36 @@ mongoose
   .then(() => console.log("MongoDB connected"))
   .catch(err => console.error("MongoDB connection error:", err));
 
-// Middleware
+// ----------------- Middleware -----------------
 app.use(helmet());
 app.use(express.json());
 app.use(morgan("dev"));
 app.use(apiCounter);
 app.use(requestCounter);
 
-// Allow CORS for frontend
+// ----------------- CORS -----------------
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://hilarious-sorbet-eb5396.netlify.app"
+];
+
 app.use(cors({
-  origin: "http://localhost:3000", // or your frontend URL
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true); // allow curl/Postman
+    if (allowedOrigins.indexOf(origin) === -1) {
+      return callback(new Error("CORS policy does not allow this origin: " + origin), false);
+    }
+    return callback(null, true);
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
+// Explicitly handle preflight
+app.options("*", cors());
+
+// ----------------- Rate Limiting -----------------
 // Skip rate limiter for SSE stream
 app.use((req, res, next) => {
   if (req.path === "/api/alerts/stream") {
@@ -61,7 +77,7 @@ const limiter = rateLimit({
 });
 app.use("/api/auth/login", limiter);
 
-// Session with Redis
+// ----------------- Session with Redis -----------------
 const RedisStore = connectRedis;
 app.use(
   session({
@@ -72,40 +88,19 @@ app.use(
     cookie: { secure: false, httpOnly: true, maxAge: 1000 * 60 * 10 }
   })
 );
-// Allow your Netlify frontend + localhost for dev
-const allowedOrigins = [
-  "http://localhost:3000",
-  "https://hilarious-sorbet-eb5396.netlify.app"
-];
 
-app.use(cors({
-  origin: function (origin, callback) {
-    // allow requests with no origin (like curl, Postman)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      return callback(new Error("CORS policy does not allow this origin: " + origin), false);
-    }
-    return callback(null, true);
-  },
-  credentials: true, // if you use cookies/auth headers
-}));
-
-// also handle preflight requests explicitly
-app.options("*", cors());
-// Routes (all under /api)
+// ----------------- Routes -----------------
 app.use("/api/auth", authRoutes);
 app.use("/api/employees", employeeRoutes);
-app.use("/api/alerts", alertsRoutes); // ✅ fixed path
+app.use("/api/alerts", alertsRoutes);
 app.use("/api/analytics", analyticsRoutes);
-app.use('/api',testRoutes);
-
+app.use("/api", testRoutes);
 app.use("/api", testRateLimitRoutes);
 
-
-
+// ----------------- Request Logger -----------------
 app.use(requestLogger);
 
-// Global error handler
+// ----------------- Global Error Handler -----------------
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: err.message });
