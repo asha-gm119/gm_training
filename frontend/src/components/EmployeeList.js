@@ -7,13 +7,15 @@ export default function EmployeeList() {
   const [loading, setLoading] = useState(true);
   const [editId, setEditId] = useState(null);
   const [error, setError] = useState('');
+  const [source, setSource] = useState(''); // <-- NEW
 
   const load = async () => {
     setLoading(true);
     setError('');
     try {
       const res = await fetchEmployees();
-      // endpoint returns { fromCache, data }
+      console.log("Data source:", res.source); // console log for debugging
+      setSource(res.source || ''); // <-- store it in state
       setEmployees(res.data || res);
     } catch (err) {
       setError(err?.response?.data?.error || 'Failed to fetch');
@@ -61,7 +63,12 @@ export default function EmployeeList() {
   return (
     <div>
       <h3>Employees</h3>
-      <EmployeeForm onSubmit={editId ? handleUpdate : handleCreate} editing={!!editId} initial={employees.find(e => e._id === editId)} />
+      {source && <div className="mb-2"><strong>Data Source:</strong> {source}</div>} {/* <-- UI output */}
+      <EmployeeForm 
+        onSubmit={editId ? handleUpdate : handleCreate} 
+        editing={!!editId} 
+        initial={employees.find(e => e._id === editId)} 
+      />
       {loading && <div>Loading...</div>}
       {error && <div className="alert alert-danger">{error}</div>}
       {!loading && employees.length === 0 && <div>No employees yet</div>}

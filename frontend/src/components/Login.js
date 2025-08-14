@@ -13,8 +13,9 @@ export default function Login({ setUser }) {
     setErr('');
     try {
       const res = await login({ username, password });
+      localStorage.setItem("token", res.token);
       setUser(res.user);
-      navigate('/');
+      navigate('/dashboard');
     } catch (error) {
       setErr(error?.response?.data?.error || 'Login failed');
     }
