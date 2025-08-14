@@ -14,16 +14,23 @@ export default function Alerts({ user, alerts, setAlerts }) {
       return;
     }
 
-    // Create SSE connection only if logged in
-    const eventSource = new EventSource("http://localhost:5000/api/alerts/stream", {
-      withCredentials: true
+    // Use API base from env (fallback to localhost)
+    const apiBase =
+      process.env.REACT_APP_API_BASE || "http://localhost:5000";
+
+    const eventSource = new EventSource(`${apiBase}/api/alerts/stream`, {
+      withCredentials: true,
     });
     eventSourceRef.current = eventSource;
 
     eventSource.onmessage = (event) => {
-      const newAlert = JSON.parse(event.data);
-      if (newAlert.type === "ping") return;
-      setAlerts((prev) => [newAlert, ...prev]);
+      try {
+        const newAlert = JSON.parse(event.data);
+        if (newAlert.type === "ping") return; // ignore heartbeats
+        setAlerts((prev) => [newAlert, ...prev]);
+      } catch (err) {
+        console.warn("Invalid SSE message:", event.data);
+      }
     };
 
     eventSource.onerror = (err) => {
