@@ -64,7 +64,7 @@ app.options("*", cors());
 // ----------------- Rate Limiting -----------------
 // Skip rate limiter for SSE stream
 app.use((req, res, next) => {
-  if (req.path === "/api/alerts/stream") {
+  if (req.path === "/alerts/stream") {
     return next();
   }
   return rateLimiter(req, res, next);
