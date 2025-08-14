@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
 import { publisher, storeToken, revokeToken } from "../utils/redisClient.js";
+import { broadcastAlert } from "../routes/alerts.js"; // <-- added SSE broadcaster
 
 const router = express.Router();
 
@@ -28,27 +29,23 @@ router.post("/register", async (req, res) => {
     const user = new User({ username, password: hashed });
     await user.save();
 
-    // create JWT
     const token = jwt.sign(
       { id: user._id, username: user.username },
       JWT_SECRET,
       { expiresIn: JWT_TTL }
     );
 
-    // store token in redis
     await storeToken(token, user._id, JWT_TTL);
-
-    // publish alert
-    await publisher.publish(
-      "alerts",
-      JSON.stringify({
-        type: "user_created",
-        message: `New user ${user.username} registered`,
-      })
-    );
-
-    // optional: keep session
     req.session.userId = user._id;
+
+    // 🔥 broadcast SSE + Redis pub/sub
+    const alert = {
+      type: "user_created",
+      message: `New user ${user.username} registered`,
+      timestamp: Date.now(),
+    };
+    broadcastAlert(alert);
+    await publisher.publish("alerts", JSON.stringify(alert));
 
     res.status(201).json({
       message: "registered",
@@ -82,16 +79,16 @@ router.post("/login", async (req, res) => {
     );
 
     await storeToken(token, user._id, JWT_TTL);
-
     req.session.userId = user._id;
 
-    await publisher.publish(
-      "alerts",
-      JSON.stringify({
-        type: "login",
-        message: `User ${user.username} logged in`,
-      })
-    );
+    // 🔥 broadcast SSE + Redis pub/sub
+    const alert = {
+      type: "login",
+      message: `User ${user.username} logged in`,
+      timestamp: Date.now(),
+    };
+    broadcastAlert(alert);
+    await publisher.publish("alerts", JSON.stringify(alert));
 
     res.json({
       message: "logged in",
@@ -115,13 +112,14 @@ router.post("/logout", async (req, res) => {
 
       const decoded = jwt.decode(token);
       if (decoded?.username) {
-        await publisher.publish(
-          "alerts",
-          JSON.stringify({
-            type: "logout",
-            message: `User ${decoded.username} logged out`,
-          })
-        );
+        // 🔥 broadcast SSE + Redis pub/sub
+        const alert = {
+          type: "logout",
+          message: `User ${decoded.username} logged out`,
+          timestamp: Date.now(),
+        };
+        broadcastAlert(alert);
+        await publisher.publish("alerts", JSON.stringify(alert));
       }
     }
 

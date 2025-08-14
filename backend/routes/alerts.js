@@ -1,47 +1,47 @@
-import express from "express";
-const router = express.Router();
-
 let clients = [];
 
+// Broadcast helper
+function broadcastAlert(alert) {
+  const payload = `data: ${JSON.stringify(alert)}\n\n`;
+  clients.forEach((res) => res.write(payload));
+}
+
 router.get("/stream", (req, res) => {
-  try {
-    const allowedOrigin =
-      process.env.CLIENT_URL || "https://radiant-otter-7af0be.netlify.app";
+  const allowedOrigin =
+    process.env.CLIENT_URL || "https://radiant-otter-7af0be.netlify.app";
 
-    // CORS headers
-    res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
-    res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
 
-    // SSE headers
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("Connection", "keep-alive");
+  if (res.flushHeaders) res.flushHeaders();
 
-    // Send headers immediately
-    if (res.flushHeaders) {
-      res.flushHeaders();
-    }
+  clients.push(res);
 
-    // Store client
-    clients.push(res);
+  res.write(": connected\n\n");
 
-    // Initial comment (does not break JSON parsing)
-    res.write(": connected\n\n");
+  const keepAlive = setInterval(() => {
+    res.write(`data: ${JSON.stringify({ type: "ping" })}\n\n`);
+  }, 20000);
 
-    // Heartbeat every 20s
-    const keepAlive = setInterval(() => {
-      res.write(`: heartbeat\n\n`);
-    }, 20000);
-
-    // On disconnect
-    req.on("close", () => {
-      clearInterval(keepAlive);
-      clients = clients.filter((c) => c !== res);
-    });
-  } catch (err) {
-    console.error("🔥 SSE stream error:", err);
-    res.status(500).end();
-  }
+  req.on("close", () => {
+    clearInterval(keepAlive);
+    clients = clients.filter((c) => c !== res);
+  });
 });
 
+// Example endpoint: trigger an alert manually
+router.post("/send", (req, res) => {
+  const alert = {
+    type: "info",
+    message: req.body.message || "New alert",
+    timestamp: Date.now(),
+  };
+  broadcastAlert(alert);
+  res.json({ status: "ok" });
+});
+
+export { broadcastAlert };
 export default router;
