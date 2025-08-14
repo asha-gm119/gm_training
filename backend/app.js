@@ -7,62 +7,86 @@ import rateLimit from "express-rate-limit";
 import connectRedis from "connect-redis";
 import { redisClient } from "./utils/redisClient.js";
 import employeeRoutes from "./routes/employees.js";
-import authRoutes from "./routes/auth.js"; // ✅ auth route
-import dotenv from 'dotenv';
-import cors from 'cors';
+import authRoutes from "./routes/auth.js";
+import dotenv from "dotenv";
+import cors from "cors";
 import rateLimiter from "./middleware/rateLimiter.js";
 import apiCounter from "./middleware/apiCounter.js";
-
-
-
-
+import alertsRoutes from "./routes/alerts.js";
+import analyticsRoutes from "./routes/analytics.js";
+import requestLogger from "./middleware/requestLogger.js";
+import { requestCounter } from "./middleware/requestCounter.js";
+import testRoutes from "./routes/test.js";
+import testRateLimitRoutes from "./routes/testRateLimt.js";
 dotenv.config();
 const app = express();
 
-// MongoDB connection
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-}).then(() => console.log("MongoDB connected"))
+// Connect to MongoDB
+mongoose
+  .connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true
+  })
+  .then(() => console.log("MongoDB connected"))
   .catch(err => console.error("MongoDB connection error:", err));
 
-// Security and body parsing
+// Middleware
 app.use(helmet());
 app.use(express.json());
 app.use(morgan("dev"));
-app.use(rateLimiter); 
 app.use(apiCounter);
+app.use(requestCounter);
 
-// Rate limiter
+// Allow CORS for frontend
+app.use(cors({
+  origin: "http://localhost:3000", // or your frontend URL
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"]
+}));
+
+// Skip rate limiter for SSE stream
+app.use((req, res, next) => {
+  if (req.path === "/api/alerts/stream") {
+    return next();
+  }
+  return rateLimiter(req, res, next);
+});
+
+// Login-specific rate limiter
 const limiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 10,
+  max: 10000000,
   message: "Too many requests, please try again later."
 });
-app.use(limiter);
+app.use("/api/auth/login", limiter);
 
-// Session store (connect-redis@7 style)
-const RedisStore = connectRedis; // ✅ class-based, no function call
-app.use(session({
-  store: new RedisStore({ client: redisClient }),
-  secret: process.env.SESSION_SECRET,
-  resave: false,
-  saveUninitialized: false,
-  cookie: { secure: false, httpOnly: true, maxAge: 1000 * 60 * 10 }
-}));
-
-
-app.use(cors({
-  origin: "http://localhost:3000", // React frontend URL
-  credentials: true // allow cookies/session to be sent
-}));
-
-
-// Routes
-app.use("/api/auth", authRoutes);       // ✅ auth API
+// Session with Redis
+const RedisStore = connectRedis;
+app.use(
+  session({
+    store: new RedisStore({ client: redisClient }),
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: { secure: false, httpOnly: true, maxAge: 1000 * 60 * 10 }
+  })
+);
+app.options("*", cors());
+// Routes (all under /api)
+app.use("/api/auth", authRoutes);
 app.use("/api/employees", employeeRoutes);
+app.use("/api/alerts", alertsRoutes); // ✅ fixed path
+app.use("/api/analytics", analyticsRoutes);
+app.use('/api',testRoutes);
 
-// Error handler
+app.use("/api", testRateLimitRoutes);
+
+
+
+app.use(requestLogger);
+
+// Global error handler
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(500).json({ error: err.message });

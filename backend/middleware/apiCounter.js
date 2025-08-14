@@ -1,4 +1,4 @@
-// middleware/apiCounter.js
+
 import { redisClient } from "../utils/redisClient.js";
 
 export default async function apiCounter(req, res, next) {

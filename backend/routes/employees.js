@@ -1,84 +1,123 @@
+// routes/employees.js
 import express from "express";
 import Employee from "../models/Employee.js";
-import requireAuth from "../middleware/auth.js";
-import cacheMiddleware from "../middleware/cache.js";
-import { redisClient } from "../utils/redisClient.js";
+import { authMiddleware } from "../middleware/authMiddleware.js"; // JWT + Redis validation
+import { publisher, redisClient } from "../utils/redisClient.js";
 
 const router = express.Router();
 
-router.use(requireAuth);
+// All employee routes require JWT authentication via Redis
+router.use(authMiddleware);
 
-router.get("/", cacheMiddleware, async (req, res, next) => {
+// Helper to clear Redis cache for employees
+async function clearEmployeeCache() {
+  await redisClient.del("employees");
+}
+
+// GET /employees → Prefer Redis cache, fallback to MongoDB
+router.get("/", async (req, res, next) => {
   try {
-    const employees = await Employee.find().sort({ createdAt: -1 }).lean();
-    await redisClient.setEx("employees:all", 300, JSON.stringify(employees));
-    res.json({ fromCache: false, data: employees });
+    const cached = await redisClient.get("employees");
+    if (cached) {
+      return res.json({
+        source: "Redis (Session Cache)",
+        data: JSON.parse(cached)
+      });
+    }
+
+    const employees = await Employee.find()
+      .sort({ createdAt: -1 })
+      .lean();
+
+    await redisClient.set("employees", JSON.stringify(employees), { EX: 60 }); // 60 sec TTL
+    res.json({ source: "MongoDB", data: employees });
   } catch (err) {
     next(err);
   }
 });
 
+// POST /employees → Add new employee
 router.post("/", async (req, res, next) => {
   try {
     const { name, email, department } = req.body;
     if (!name || !email || !department) {
-      return res.status(400).json({ error: "name, email, department are required" });
+      return res.status(400).json({ error: "name, email, and department are required" });
     }
-    const existing = await Employee.findOne({ email: email.toLowerCase() });
-    if (existing) return res.status(400).json({ error: "Email already exists" });
 
     const emp = new Employee({ name, email, department });
     await emp.save();
-    await redisClient.del("employees:all");
 
+    const actor = req.user?.username || "unknown";
+    await publisher.publish("alerts", JSON.stringify({
+      type: "employee_added",
+      message: `User ${actor} added employee ${emp.name}`
+    }));
+
+    await clearEmployeeCache();
     res.status(201).json(emp);
   } catch (err) {
     next(err);
   }
 });
 
-router.get("/:id", async (req, res, next) => {
-  try {
-    const emp = await Employee.findById(req.params.id);
-    if (!emp) return res.status(404).json({ error: "Not found" });
-    res.json(emp);
-  } catch (err) {
-    next(err);
-  }
-});
-
+// PUT /employees/:id → Update employee
 router.put("/:id", async (req, res, next) => {
   try {
     const { name, email, department } = req.body;
-    const updates = {};
-    if (name) updates.name = name;
-    if (email) updates.email = email;
-    if (department) updates.department = department;
+    const updated = await Employee.findByIdAndUpdate(
+      req.params.id,
+      { name, email, department },
+      { new: true, runValidators: true }
+    );
 
-    if (email) {
-      const other = await Employee.findOne({ email: email.toLowerCase(), _id: { $ne: req.params.id } });
-      if (other) return res.status(400).json({ error: "Email already in use" });
+    if (!updated) {
+      return res.status(404).json({ error: "Employee not found" });
     }
 
-    const emp = await Employee.findByIdAndUpdate(req.params.id, updates, { new: true, runValidators: true });
-    if (!emp) return res.status(404).json({ error: "Not found" });
+    const actor = req.user?.username || "unknown";
+    await publisher.publish("alerts", JSON.stringify({
+      type: "employee_updated",
+      message: `User ${actor} updated employee ${updated.name}`
+    }));
 
-    await redisClient.del("employees:all");
-    res.json(emp);
+    await clearEmployeeCache();
+    res.json(updated);
   } catch (err) {
     next(err);
   }
 });
 
+// DELETE /employees/:id → Delete employee
 router.delete("/:id", async (req, res, next) => {
   try {
-    const emp = await Employee.findByIdAndDelete(req.params.id);
-    if (!emp) return res.status(404).json({ error: "Not found" });
+    const deleted = await Employee.findByIdAndDelete(req.params.id);
+    if (!deleted) {
+      return res.status(404).json({ error: "Employee not found" });
+    }
 
-    await redisClient.del("employees:all");
-    res.json({ message: "Deleted" });
+    const actor = req.user?.username || "unknown";
+    await publisher.publish("alerts", JSON.stringify({
+      type: "employee_deleted",
+      message: `User ${actor} deleted employee ${deleted.name}`
+    }));
+
+    await clearEmployeeCache();
+    res.json({ message: "Employee deleted", id: req.params.id });
   } catch (err) {
     next(err);
+  }
+});
+
+// GET /employees/check-session → Check cache source
+router.get("/check-session", async (req, res) => {
+  try {
+    const cached = await redisClient.get("employees");
+    if (cached) {
+      return res.json({ source: "Redis (Session Cache)" });
+    }
+    return res.json({ source: "MongoDB" });
+  } catch (err) {
+    return res.status(500).json({ source: "Unknown (Error checking cache)" });
   }
 });
 

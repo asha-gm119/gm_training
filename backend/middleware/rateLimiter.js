@@ -1,4 +1,4 @@
-// backend/middleware/rateLimiter.js
+
 import { redisClient } from "../utils/redisClient.js";
 
 const WINDOW_MINUTES = parseInt(process.env.RATE_LIMIT_WINDOW_MINUTES || '15', 10);
