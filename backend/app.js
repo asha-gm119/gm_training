@@ -12,7 +12,7 @@ import dotenv from "dotenv";
 import cors from "cors";
 import rateLimiter from "./middleware/rateLimiter.js";
 import apiCounter from "./middleware/apiCounter.js";
-import alertsRoutes from "./routes/alerts.js";
+import alertsRoutes,{broadcastAlert} from "./routes/alerts.js";
 import analyticsRoutes from "./routes/analytics.js";
 import requestLogger from "./middleware/requestLogger.js";
 import { requestCounter } from "./middleware/requestCounter.js";
