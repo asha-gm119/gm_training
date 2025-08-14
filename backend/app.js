@@ -42,7 +42,7 @@ app.use(requestCounter);
 const allowedOrigins = [
   "http://localhost:3000",
   "https://hilarious-sorbet-eb5396.netlify.app",
-   "https://lively-faun-e79255.netlify.app"
+  "https://lively-faun-e79255.netlify.app"
 ];
 
 app.use(cors({
