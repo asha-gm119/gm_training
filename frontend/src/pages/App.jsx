@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, Link, useNavigate, useLocation } from 'react-r
 import { AppBar, Toolbar, Typography, Button, Container } from '@mui/material'
 import { useAuth } from '../state/AuthContext.jsx'
 import Login from './Login.jsx'
-import Auth from './Auth.jsx'
+import AuthForm from './AuthForm.jsx'
 import Dashboard from './Dashboard.jsx'
 import FlightsPage from './FlightsPage.jsx'
 import BaggagePage from './BaggagePage.jsx'
@@ -47,7 +47,8 @@ export default function App() {
       <Container sx={{ mt: hideChrome ? 0 : 3, maxWidth: hideChrome ? '100% !important' : undefined, padding: hideChrome ? 0 : undefined }}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/login" element={<Auth />} />
+          <Route path="/login" element={<AuthForm />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/flights" element={<PrivateRoute roles={['AIRLINE', 'ADMIN']}><FlightsPage /></PrivateRoute>} />
           <Route path="/baggage" element={<PrivateRoute roles={['BAGGAGE', 'ADMIN']}><BaggagePage /></PrivateRoute>} />
           <Route path="/users" element={<PrivateRoute roles={['ADMIN']}><UsersPage /></PrivateRoute>} />
