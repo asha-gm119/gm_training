@@ -1,7 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios'
 import { io } from 'socket.io-client'
-import { Alert, Box, Card, CardContent, Grid, Typography, Chip, Stack } from '@mui/material'
+import { Alert, Box, Grid, Typography, Chip, Stack } from '@mui/material'
+import KPI from '../components/widgets/KPI.jsx'
+import TrendChart from '../components/widgets/TrendChart.jsx'
+import ListCard from '../components/widgets/ListCard.jsx'
 
 export default function Dashboard() {
   const [flights, setFlights] = useState([])
@@ -44,6 +47,17 @@ export default function Dashboard() {
     return () => socket.close()
   }, [])
 
+  const kpis = [
+    { title: 'Active Flights', value: flights.filter(f => ['SCHEDULED','BOARDING','DELAYED'].includes(f.status)).length, color: 'primary.main' },
+    { title: 'Departed Today', value: flights.filter(f => f.status==='DEPARTED').length, color: 'success.main' },
+    { title: 'Delayed', value: flights.filter(f => f.status==='DELAYED').length, color: 'warning.main' },
+    { title: 'Baggage In Transit', value: Object.values(baggageByFlight).flat().filter(b => b.status==='IN_TRANSIT').length, color: 'info.main' },
+  ]
+
+  const trendData = flights.slice(0, 10).map((f, idx) => ({ name: f.flightNumber, value: (baggageByFlight[f._id]||[]).length || 0 }))
+
+  const recentFlights = flights.slice(0, 5).map(f => ({ title: `${f.flightNumber} — ${f.airline}`, subtitle: `Gate ${f.gate || '-'} • ${new Date(f.scheduledTime).toLocaleTimeString()}` }))
+
   return (
     <Grid container spacing={2}>
       <Grid item xs={12}>
@@ -55,24 +69,35 @@ export default function Dashboard() {
           ))}
         </Stack>
       </Grid>
-      {flights.map((f) => (
-        <Grid item xs={12} md={6} lg={4} key={f._id}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6">{f.flightNumber} — {f.airline}</Typography>
-              <Typography variant="body2">Gate: <b>{f.gate || '-'}</b></Typography>
-              <Typography variant="body2">Scheduled: {new Date(f.scheduledTime).toLocaleString()}</Typography>
-              <Chip label={f.status} color={f.status === 'DELAYED' ? 'warning' : f.status === 'BOARDING' ? 'info' : f.status === 'DEPARTED' ? 'success' : 'default'} size="small" sx={{ mt: 1 }} />
-              <Box mt={1}>
-                <Typography variant="subtitle2">Baggage:</Typography>
-                {((baggageByFlight[f._id] || []).slice(0, 5)).map(b => (
-                  <Chip key={b._id} label={`${b.tagNumber} — ${b.status}`} size="small" sx={{ mr: 0.5, mb: 0.5 }} />
-                ))}
-              </Box>
-            </CardContent>
-          </Card>
-        </Grid>
+
+      {kpis.map((k, i) => (
+        <Grid item xs={12} sm={6} md={3} key={i}><KPI title={k.title} value={k.value} color={k.color} /></Grid>
       ))}
+
+      <Grid item xs={12} md={8}><TrendChart title="Baggage by Flight" data={trendData} /></Grid>
+      <Grid item xs={12} md={4}><ListCard title="Recent Flights" items={recentFlights} /></Grid>
+
+      <Grid item xs={12}>
+        <Typography variant="h6" sx={{ mb: 1 }}>Flights</Typography>
+        <Grid container spacing={2}>
+          {flights.map((f) => (
+            <Grid item xs={12} md={6} lg={4} key={f._id}>
+              <Box p={2} border={1} borderColor="#eee" borderRadius={2}>
+                <Typography variant="subtitle1">{f.flightNumber} — {f.airline}</Typography>
+                <Typography variant="body2">Gate: <b>{f.gate || '-'}</b></Typography>
+                <Typography variant="body2">Scheduled: {new Date(f.scheduledTime).toLocaleString()}</Typography>
+                <Chip label={f.status} color={f.status === 'DELAYED' ? 'warning' : f.status === 'BOARDING' ? 'info' : f.status === 'DEPARTED' ? 'success' : 'default'} size="small" sx={{ mt: 1 }} />
+                <Box mt={1}>
+                  <Typography variant="subtitle2">Baggage:</Typography>
+                  {((baggageByFlight[f._id] || []).slice(0, 5)).map(b => (
+                    <Chip key={b._id} label={`${b.tagNumber} — ${b.status}`} size="small" sx={{ mr: 0.5, mb: 0.5 }} />
+                  ))}
+                </Box>
+              </Box>
+            </Grid>
+          ))}
+        </Grid>
+      </Grid>
     </Grid>
   )
 }
