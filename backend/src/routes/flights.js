@@ -3,6 +3,7 @@ import Flight from '../models/Flight.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { kafkaProducer } from '../startup/kafka.js';
 import { redisSetFlight, redisRemoveFlight } from '../startup/redis.js';
+import Notification from '../models/Notification.js';
 
 const router = Router();
 
@@ -27,6 +28,10 @@ router.put('/:id', authMiddleware(['AIRLINE', 'ADMIN']), async (req, res) => {
 	const type = req.body.status === 'DELAYED' ? 'flight-delayed' : 'flight-updated';
 	await kafkaProducer.send({ topic: 'flight-events', messages: [{ key: type, value: JSON.stringify({ type, flight }) }] });
 	await redisSetFlight(flight);
+	if (type === 'flight-delayed') {
+		const note = await Notification.create({ type: 'FLIGHT_DELAY', message: `Flight ${flight.flightNumber} delayed`, audience: 'STAFF', flightId: flight._id });
+		req.app.get('io').emit('notification', note);
+	}
 	res.json(flight);
 });
 

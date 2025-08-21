@@ -4,6 +4,7 @@ import cors from 'cors';
 import http from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 import mongoose from 'mongoose';
+import { MongoMemoryServer } from 'mongodb-memory-server';
 import { createClient as createRedisClient } from 'redis';
 import { Kafka } from 'kafkajs';
 
@@ -11,6 +12,7 @@ import authRouter from './src/routes/auth.js';
 import usersRouter from './src/routes/users.js';
 import flightsRouter from './src/routes/flights.js';
 import baggageRouter from './src/routes/baggage.js';
+import notificationsRouter from './src/routes/notifications.js';
 import { seedAdminIfNeeded } from './src/startup/seedAdmin.js';
 import { initKafka, kafkaProducer, registerKafkaConsumers } from './src/startup/kafka.js';
 import { getRedisClient } from './src/startup/redis.js';
@@ -38,11 +40,19 @@ app.use('/api/auth', authRouter);
 app.use('/api/users', authMiddleware(['ADMIN']), usersRouter);
 app.use('/api/flights', flightsRouter);
 app.use('/api/baggage', baggageRouter);
+app.use('/api/notifications', notificationsRouter);
 
 const PORT = process.env.PORT || 4000;
 
 async function start() {
-	await mongoose.connect(process.env.MONGO_URI);
+	if (process.env.USE_INMEMORY === '1') {
+		const mongod = await MongoMemoryServer.create();
+		const uri = mongod.getUri('airport_ops');
+		await mongoose.connect(uri);
+		console.log('MongoMemoryServer started');
+	} else {
+		await mongoose.connect(process.env.MONGO_URI);
+	}
 	await getRedisClient();
 	await initKafka();
 	await registerKafkaConsumers(io);

@@ -4,6 +4,7 @@ import Flight from '../models/Flight.js';
 import { authMiddleware } from '../middleware/auth.js';
 import { kafkaProducer } from '../startup/kafka.js';
 import { redisSetBaggage, redisRemoveBaggage } from '../startup/redis.js';
+import Notification from '../models/Notification.js';
 
 const router = Router();
 
@@ -33,6 +34,12 @@ router.put('/:id/status', authMiddleware(['BAGGAGE', 'ADMIN']), async (req, res)
 	if (!bag) return res.status(404).json({ error: 'Not found' });
 	await kafkaProducer.send({ topic: 'baggage-events', messages: [{ key: 'baggage-updated', value: JSON.stringify({ type: 'baggage-updated', baggage: bag }) }] });
 	await redisSetBaggage(bag);
+	if (status === 'AT_BELT') {
+		const flight = bag.flightId ? await Flight.findById(bag.flightId) : null;
+		const msg = `Baggage ${bag.tagNumber} available at belt for ${flight ? flight.flightNumber : 'unassigned flight'}`;
+		const note = await Notification.create({ type: 'BAGGAGE_BELT', message: msg, audience: 'PASSENGERS', flightId: bag.flightId || undefined });
+		req.app.get('io').emit('notification', note);
+	}
 	res.json(bag);
 });
 
