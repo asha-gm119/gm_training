@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Box, CssBaseline, Drawer, AppBar, Toolbar, Typography, IconButton, List, ListItemButton, ListItemIcon, ListItemText, Divider, Button } from '@mui/material';
+import { Box, Drawer, AppBar, Toolbar, Typography, IconButton, List, ListItemButton, ListItemIcon, ListItemText, Divider, Button } from '@mui/material';
 import { Menu as MenuIcon, Analytics as AnalyticsIcon, Luggage as LuggageIcon, Flight as FlightIcon, Group as GroupIcon, Logout as LogoutIcon } from '@mui/icons-material';
 import { useAuth } from '../state/AuthContext.jsx';
 import AnalyticsPanel from '../sections/AnalyticsPanel.jsx';
@@ -46,9 +46,8 @@ const Dashboard = () => {
 	);
 
 	return (
-		<Box sx={{ display: 'flex' }}>
-			<CssBaseline />
-			<AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+		<Box sx={{ display: 'flex', bgcolor: 'background.default' }}>
+			<AppBar position="fixed">
 				<Toolbar>
 					<IconButton color="inherit" edge="start" onClick={handleDrawerToggle} sx={{ mr: 2 }}>
 						<MenuIcon />
@@ -67,7 +66,7 @@ const Dashboard = () => {
 			<Drawer variant="permanent" sx={{ display: { xs: 'none', sm: 'block' }, '& .MuiDrawer-paper': { boxSizing: 'border-box', width: drawerWidth } }} open>
 				{drawer}
 			</Drawer>
-			<Box component="main" sx={{ flexGrow: 1, p: 3 }}>
+			<Box component="main" sx={{ flexGrow: 1, p: 3, minHeight: '100vh', background: 'linear-gradient(180deg, #fff7ef, #ffffff)' }}>
 				<Toolbar />
 				{active === 'analytics' && <AnalyticsPanel />}
 				{active === 'users' && user?.role === 'ADMIN' && <AdminUsers />}
