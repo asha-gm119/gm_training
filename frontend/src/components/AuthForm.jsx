@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../state/AuthContext.jsx";
 import api from "../api/client";
@@ -7,7 +7,7 @@ import "../styles/auth.css";
 
 const AuthForm = () => {
 	const navigate = useNavigate();
-	const { login, user } = useAuth();
+	const { login, user, loading } = useAuth();
 
 	const [isSignUp, setIsSignUp] = useState(false);
 	const [formData, setFormData] = useState({
@@ -16,6 +16,12 @@ const AuthForm = () => {
 		password: "",
 		role: "Airline",
 	});
+
+	const isAdmin = !!user && String(user.role).toUpperCase().includes('ADMIN');
+
+	useEffect(() => {
+		if (isAdmin) setIsSignUp(true);
+	}, [isAdmin]);
 
 	const toggleForm = () => setIsSignUp(!isSignUp);
 
@@ -26,7 +32,11 @@ const AuthForm = () => {
 	const handleSubmit = async () => {
 		try {
 			if (isSignUp) {
-				if (!user || user.role !== 'ADMIN') {
+				if (loading) {
+					alert('Please wait, verifying session...');
+					return;
+				}
+				if (!isAdmin) {
 					alert('Sign up requires an ADMIN to be logged in.');
 					return;
 				}
@@ -106,7 +116,7 @@ const AuthForm = () => {
 							<option value="Baggage">Baggage</option>
 						</select>
 					</label>
-					<button type="button" className="submit" onClick={handleSubmit}>Sign Up</button>
+					<button type="button" className="submit" onClick={handleSubmit} disabled={isSignUp && !isAdmin}>Sign Up</button>
 				</div>
 			</div>
 		</div>
