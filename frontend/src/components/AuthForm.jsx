@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../state/AuthContext.jsx";
+import api from "../api/client";
+import { USERS_BASE_PATH } from "../config";
 import "../styles/auth.css";
 
 const AuthForm = () => {
@@ -36,7 +37,7 @@ const AuthForm = () => {
 					password: formData.password,
 					role: roleMap[formData.role] || 'AIRLINE'
 				};
-				await axios.post(`/api/users`, payload);
+				await api.client.post(`${USERS_BASE_PATH}`, payload);
 				alert("User registered successfully!");
 				setIsSignUp(false);
 				setFormData({ ...formData, password: "" });
@@ -46,7 +47,8 @@ const AuthForm = () => {
 			}
 		} catch (err) {
 			console.error(err);
-			alert("Error: " + (err.response?.data?.error || err.message));
+			const serverMsg = err?.response?.data?.error || err?.response?.data?.message || err.message;
+			alert("Error: " + serverMsg);
 		}
 	};
 
